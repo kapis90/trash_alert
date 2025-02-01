@@ -16,6 +16,7 @@ from fasthtml.common import (
     Footer,
     Header,
     Small,
+    A,
 )
 from supabase import Client, create_client
 
@@ -76,7 +77,23 @@ def render_message(entry):
 
 @rt("/")
 def get():
-    return Titled("Alert śmieciowy!", render_content())
+    return Titled("Alert śmieciowy!",
+                  Div(A("Zaloguj się", href="/login"), style="text-align: right"),
+                  render_content())
+
+@rt("/login")
+def get():
+    return Titled("Logowanie",
+                  Div(A("Powrót", href="/"), style="text-align: right"),
+                  Div(
+                      Form(
+                          Fieldset(
+                              Input(type="text", name="login", placeholder="Login", required=True),
+                              Input(type="password", name="password", placeholder="Hasło", required=True),
+                              Button("Zaloguj", type="submit"),
+                          ),
+                      ),
+                  ))
 
 
 serve()
