@@ -26,19 +26,22 @@ from supabase import Client, create_client
 class Auth(OAuth):
     def get_auth(self, info, ident, session, state):
         email = info.email or ""
-        if info.email_verified and email.split("@")[-1] == "answer.ai":
-            return RedirectResponse("/", status_code=303)
+        # if info.email_verified and email.split("@")[-1] == "answer.ai":
+        #     return RedirectResponse("/", status_code=303)
 
 
-app, rt = fast_app(before=[lambda req, session: session.setdefault("auth", None)])
+app, rt = fast_app()
 load_dotenv()
 google_client = GoogleAppClient(
     os.getenv("AUTH_CLIENT_ID"), os.getenv("AUTH_CLIENT_SECRET")
 )
 supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
 
-oauth = Auth(app, google_client, skip=["/redirect", "/error", "/login", "/"])
-
+oauth = Auth(
+    app,
+    google_client,
+    skip=["/redirect", "/error", "/login", "/"]
+)
 
 def render_content():
     # form = Form(
