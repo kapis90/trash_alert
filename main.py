@@ -17,14 +17,27 @@ from fasthtml.common import (
     Header,
     Small,
     A,
+    RedirectResponse,
 )
+from fasthtml.oauth import GoogleAppClient, OAuth
 from supabase import Client, create_client
 
-app, rt = fast_app()
 
+class Auth(OAuth):
+    def get_auth(self, info, ident, session, state):
+        email = info.email or ""
+        if info.email_verified and email.split("@")[-1] == "answer.ai":
+            return RedirectResponse("/", status_code=303)
+
+
+app, rt = fast_app(before=[lambda req, session: session.setdefault("auth", None)])
 load_dotenv()
-
+google_client = GoogleAppClient(
+    os.getenv("AUTH_CLIENT_ID"), os.getenv("AUTH_CLIENT_SECRET")
+)
 supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+
+oauth = Auth(app, google_client, skip=["/redirect", "/error", "/login", "/"])
 
 
 def render_content():
@@ -55,10 +68,14 @@ def render_content():
         render_message_list(),
     )
 
+
 def get_messages():
     # Sort by 'id' in descending order to get the latest entries first
-    response = supabase.table("streets_mapping").select("*").order("id", desc=False).execute()
+    response = (
+        supabase.table("streets_mapping").select("*").order("id", desc=False).execute()
+    )
     return response.data
+
 
 def render_message_list():
     messages = get_messages()
@@ -66,6 +83,7 @@ def render_message_list():
         *[render_message(entry) for entry in messages],
         id="message-list",
     )
+
 
 def render_message(entry):
     return (
@@ -75,25 +93,51 @@ def render_message(entry):
         ),
     )
 
+
 @rt("/")
 def get():
-    return Titled("Alert śmieciowy!",
-                  Div(A("Zaloguj się", href="/login"), style="text-align: right"),
-                  render_content())
+    return Titled(
+        "Alert śmieciowy!",
+        Div(
+            A("Zaloguj się", href="/login"),
+            style="text-align: right",
+        ),
+        render_content(),
+    )
 
-@rt("/login")
-def get():
-    return Titled("Logowanie",
-                  Div(A("Powrót", href="/"), style="text-align: right"),
-                  Div(
-                      Form(
-                          Fieldset(
-                              Input(type="text", name="login", placeholder="Login", required=True),
-                              Input(type="password", name="password", placeholder="Hasło", required=True),
-                              Button("Zaloguj", type="submit"),
-                          ),
-                      ),
-                  ))
 
+@app.get("/login")
+def login(req):
+    return Titled(
+        "Logowanie",
+        Div(A("Powrót", href="/"), style="text-align: right"),
+        Div(
+            Form(
+                Fieldset(
+                    Input(
+                        type="text",
+                        name="login",
+                        placeholder="Login",
+                        required=True,
+                    ),
+                    Input(
+                        type="password",
+                        name="password",
+                        placeholder="Hasło",
+                        required=True,
+                    ),
+                    Small(A("Zarejestruj się!", href="/register")),
+                    Small(A("Log In with Google", href=oauth.login_link(req))),
+                    Button("Zaloguj", type="submit"),
+                    style="width: 300px; margin: 0 auto; padding: 20px; border: 1px solid #ccc; border-radius: 5px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);",
+                ),
+            ),
+        ),
+        style="text-align: center;",
+    )
+
+
+# @app.get('/login')
+# def login(req): return Div(P("Not logged in"), A('Log in', href=oauth.login_link(req)))
 
 serve()
