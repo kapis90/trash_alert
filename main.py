@@ -21,6 +21,8 @@ from fasthtml.common import (
 )
 from fasthtml.oauth import GoogleAppClient, OAuth
 from supabase import Client, create_client
+from src.backend.database.db_queries import DatabaseQueries
+from src.backend.database.model import Area
 
 
 class Auth(OAuth):
@@ -35,13 +37,10 @@ load_dotenv()
 google_client = GoogleAppClient(
     os.getenv("AUTH_CLIENT_ID"), os.getenv("AUTH_CLIENT_SECRET")
 )
-supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+db_queries = DatabaseQueries()
 
-oauth = Auth(
-    app,
-    google_client,
-    skip=["/redirect", "/error", "/login", "/"]
-)
+oauth = Auth(app, google_client, skip=["/redirect", "/error", "/login", "/"])
+
 
 def render_content():
     # form = Form(
@@ -68,31 +67,26 @@ def render_content():
     return Div(
         P(Em("Obszary objęte alertem:")),
         Hr(),
-        render_message_list(),
+        render_area_list(),
     )
 
 
-def get_messages():
-    # Sort by 'id' in descending order to get the latest entries first
-    response = (
-        supabase.table("streets_mapping").select("*").order("id", desc=False).execute()
-    )
-    return response.data
-
-
-def render_message_list():
-    messages = get_messages()
+def render_area_list():
+    areas = db_queries.get_areas()
     return Div(
-        *[render_message(entry) for entry in messages],
-        id="message-list",
+        *[render_area_summary(area) for area in areas],
+        id="area-list",
     )
 
 
-def render_message(entry):
+def render_area_summary(area: Area):
+    streets = ", ".join(
+        [f"ul. {street.name}" for street in db_queries.get_streets_by_area_id(area.id)]
+    )
     return (
         Article(
-            Header(f"Obszar: {entry['area']}"),
-            P(entry["streets"]),
+            Header(f"Obszar: {area.name}"),
+            P(streets),
         ),
     )
 

@@ -93,6 +93,7 @@ propcache==0.2.1
     #   yarl
 pydantic==2.10.6
     # via
+    #   trash-alert (./pyproject.toml)
     #   gotrue
     #   postgrest
 pydantic-core==2.27.2
