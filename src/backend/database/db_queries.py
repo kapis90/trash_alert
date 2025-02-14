@@ -1,7 +1,6 @@
 import os
-from typing import List
+from typing import List, Optional
 
-# from dotenv import load_dotenv
 from supabase import create_client, Client
 
 from src.backend.database.model import Area, PickUpDate, Street, User
@@ -13,54 +12,68 @@ class DatabaseQueries:
             os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY")
         )
 
-    def get_user_by_name(self, name: str) -> User:
-        return User(
-            **self.client.table("users").select("*").eq("name", name).execute().data[0]
-        )
+    def get_user_by_id(self, id: int) -> Optional[User]:
+        if (
+            response_data := self.client.table("users")
+            .select("*")
+            .eq("id", id)
+            .execute()
+            .data
+        ):
+            return User(**response_data[0])
+        return None
     
-    def get_areas(self) -> List[Area]:
-        return [
-            Area(**area)
-            for area in self.client.table("areas").select("*").execute().data
-        ]
+    def get_user_by_email(self, email: str) -> Optional[User]:
+        if (
+            response_data := self.client.table("users")
+            .select("*")
+            .eq("email", email)
+            .execute()
+            .data
+        ):
+            return User(**response_data[0])
+        return None
+    
+    def insert_user(self, username: str, email: str) -> User:
+        user = {"name": username, "email": email}
+        response_data = self.client.table("users").insert(user).execute()
+        return User(**response_data.data[0])
 
-    def get_street_by_id(self, street_id: int) -> Street:
-        return Street(
-            **self.client.table("streets")
+    def get_areas(self) -> List[Area]:
+        if response_data := self.client.table("areas").select("*").execute().data:
+            return [Area(**area) for area in response_data]
+        return []
+
+    def get_street_by_id(self, street_id: int) -> Optional[Street]:
+        if (
+            response_data := self.client.table("streets")
             .select("*")
             .eq("id", street_id)
             .execute()
-            .data[0]
-        )
-    
+            .data
+        ):
+            return Street(**response_data[0])
+        return None
+
     def get_streets_by_area_id(self, area_id: int) -> List[Street]:
-        return [
-            Street(**street)
-            for street in self.client.table("streets")
+        if (
+            response_data := self.client.table("streets")
             .select("*")
             .eq("area_id", area_id)
             .execute()
             .data
-        ]
+        ):
+            return [Street(**street) for street in response_data]
+        return []
 
     def get_pick_up_dates(self, area_id: int, type: str) -> List[PickUpDate]:
-        pick_up_dates_raw = (
-            self.client.table("pick_up_dates")
+        if (
+            response_data := self.client.table("pick_up_dates")
             .select("*")
             .eq("area_id", area_id)
             .eq("type", type)
             .execute()
             .data
-        )
-        return [PickUpDate(**date) for date in pick_up_dates_raw]
-
-
-# load_dotenv()
-# db_queries = DatabaseQueries()
-# user = db_queries.get_user_by_name("kajetan")
-# street_id = db_queries.get_user_by_name("kajetan").street_id
-# street = db_queries.get_street_by_id(street_id)
-# area_id = db_queries.get_street_by_id(street_id).area_id
-# dates = db_queries.get_pick_up_dates(area_id, "Zmieszane")
-
-# pass
+        ):
+            return [PickUpDate(**date) for date in response_data]
+        return []

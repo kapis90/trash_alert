@@ -1,5 +1,7 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
+from fasthtml.svg import Svg, NotStr
 from fasthtml.common import (
     Form,
     Fieldset,
@@ -19,17 +21,44 @@ from fasthtml.common import (
     A,
     RedirectResponse,
 )
-from fasthtml.oauth import GoogleAppClient, OAuth
-from supabase import Client, create_client
+from fasthtml.oauth import GoogleAppClient, OAuth, http_patterns
 from src.backend.database.db_queries import DatabaseQueries
 from src.backend.database.model import Area
 
 
 class Auth(OAuth):
+    def __init__(
+        self,
+        app,
+        cli,
+        skip=None,
+        redir_path="/redirect",
+        error_path="/error",
+        logout_path="/logout",
+        login_path="/",
+        https=True,
+        http_patterns=http_patterns,
+    ):
+        super().__init__(
+            app,
+            cli,
+            skip,
+            redir_path,
+            error_path,
+            logout_path,
+            login_path,
+            https,
+            http_patterns,
+        )
+        self.active_user = None
+
     def get_auth(self, info, ident, session, state):
-        email = info.email or ""
-        # if info.email_verified and email.split("@")[-1] == "answer.ai":
-        #     return RedirectResponse("/", status_code=303)
+        if not info.email_verified:
+            return RedirectResponse("/", status_code=303)
+        if user := db_queries.get_user_by_email(info.email):
+            self.active_user = user
+            return
+        self.active_user = db_queries.insert_user(username=info.name, email=info.email)
 
 
 app, rt = fast_app()
@@ -91,14 +120,25 @@ def render_area_summary(area: Area):
     )
 
 
+def render_login_content():
+    if oauth.active_user:
+        return Div(
+            P(f"Witaj {oauth.active_user.name}!"),
+            A("Wyloguj się", href="/logout"),
+            style="text-align: right",
+        )
+    else:
+        return Div(
+            A("Zaloguj się", href="/login"),
+            style="text-align: right",
+        )
+
+
 @rt("/")
 def get():
     return Titled(
         "Alert śmieciowy!",
-        Div(
-            A("Zaloguj się", href="/login"),
-            style="text-align: right",
-        ),
+        render_login_content(),
         render_content(),
     )
 
@@ -124,8 +164,11 @@ def login(req):
                         required=True,
                     ),
                     Small(A("Zarejestruj się!", href="/register")),
-                    Small(A("Log In with Google", href=oauth.login_link(req))),
                     Button("Zaloguj", type="submit"),
+                    A(
+                        NotStr(Path("./assets/web_dark_rd_SI.svg").read_text()),
+                        href=oauth.login_link(req),
+                    ),
                     style="width: 300px; margin: 0 auto; padding: 20px; border: 1px solid #ccc; border-radius: 5px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);",
                 ),
             ),
@@ -133,8 +176,5 @@ def login(req):
         style="text-align: center;",
     )
 
-
-# @app.get('/login')
-# def login(req): return Div(P("Not logged in"), A('Log in', href=oauth.login_link(req)))
 
 serve()

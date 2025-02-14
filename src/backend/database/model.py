@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel
 from datetime import date
 
@@ -6,8 +7,8 @@ class User(BaseModel):
     id: int
     name: str
     email: str
-    phone: int
-    street_id: int
+    phone: Optional[int] = None
+    street_id: Optional[int] = None
 
 
 class Area(BaseModel):
