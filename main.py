@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from fasthtml.svg import Svg, NotStr
+from fasthtml.svg import NotStr
 from fasthtml.common import (
     Form,
     Fieldset,
@@ -15,50 +15,20 @@ from fasthtml.common import (
     fast_app,
     serve,
     Article,
-    Footer,
     Header,
     Small,
     A,
     RedirectResponse,
 )
-from fasthtml.oauth import GoogleAppClient, OAuth, http_patterns
+from fasthtml.oauth import GoogleAppClient, OAuth
 from src.backend.database.db_queries import DatabaseQueries
 from src.backend.database.model import Area
 
 
 class Auth(OAuth):
-    def __init__(
-        self,
-        app,
-        cli,
-        skip=None,
-        redir_path="/redirect",
-        error_path="/error",
-        logout_path="/logout",
-        login_path="/",
-        https=True,
-        http_patterns=http_patterns,
-    ):
-        super().__init__(
-            app,
-            cli,
-            skip,
-            redir_path,
-            error_path,
-            logout_path,
-            login_path,
-            https,
-            http_patterns,
-        )
-        self.active_user = None
-
     def get_auth(self, info, ident, session, state):
         if not info.email_verified:
             return RedirectResponse("/", status_code=303)
-        if user := db_queries.get_user_by_email(info.email):
-            self.active_user = user
-            return
-        self.active_user = db_queries.insert_user(username=info.name, email=info.email)
 
 
 app, rt = fast_app()
@@ -68,31 +38,14 @@ google_client = GoogleAppClient(
 )
 db_queries = DatabaseQueries()
 
-oauth = Auth(app, google_client, skip=["/redirect", "/error", "/login", "/"])
+oauth = Auth(
+    app,
+    google_client,
+    skip=[r"/favicon\.ico", r"/static/.*", r".*\.css", r".*\.js", "/login", "/"],
+)
 
 
 def render_content():
-    # form = Form(
-    #     Fieldset(
-    #         Input(
-    #             type="text",
-    #             name="name",
-    #             placeholder="Name",
-    #             required=True,
-    #             maxlength=15,
-    #         ),
-    #         Input(
-    #             type="text",
-    #             name="message",
-    #             placeholder="Message",
-    #             required=True,
-    #             maxlength=15,
-    #         ),
-    #         Button("Submit", type="submit"),
-    #         role="group",
-    #     ),
-    # )
-
     return Div(
         P(Em("Obszary objęte alertem:")),
         Hr(),
@@ -120,10 +73,10 @@ def render_area_summary(area: Area):
     )
 
 
-def render_login_content():
-    if oauth.active_user:
+def render_login_content(sess):
+    if ident := sess.get("auth"):
         return Div(
-            P(f"Witaj {oauth.active_user.name}!"),
+            P(f"Witaj zalogowany! {ident}"),
             A("Wyloguj się", href="/logout"),
             style="text-align: right",
         )
@@ -135,19 +88,20 @@ def render_login_content():
 
 
 @rt("/")
-def get():
+def get(req, sess):
     return Titled(
         "Alert śmieciowy!",
-        render_login_content(),
+        render_login_content(sess),
         render_content(),
     )
 
 
 @app.get("/login")
-def login(req):
+def login(req, session):
     return Titled(
         "Logowanie",
         Div(A("Powrót", href="/"), style="text-align: right"),
+        render_login_content(session),
         Div(
             Form(
                 Fieldset(
